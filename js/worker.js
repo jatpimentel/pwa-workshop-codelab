@@ -14,19 +14,30 @@
  limitations under the License.
  */
 
- import { wrap, proxy } from 'comlink';
-
- window.addEventListener('DOMContentLoaded', async () => {
-   const preview = document.querySelector('.preview');
+ import { expose } from 'comlink';
+ import { marked } from 'marked';
  
-   const worker = new SharedWorker(new URL('./worker.js', import.meta.url), {
-     type: 'module',
-   });
-   const compiler = wrap(worker.port);
+ class Compiler {
+   state = {
+     raw: '',
+     compiled: '',
+   };
+   subscribers = [];
  
-   compiler.subscribe(
-     proxy((data) => {
-       preview.innerHTML = data.compiled;
-     }),
-   );
- });
+   async set(content) {
+     this.state = {
+       raw: content,
+       compiled: marked(content),
+     };
+ 
+     await Promise.all(this.subscribers.map((s) => s(this.state)));
+   }
+ 
+   subscribe(cb) {
+     this.subscribers.push(cb);
+   }
+ }
+ 
+ const compiler = new Compiler();
+ 
+ onconnect = (e) => expose(compiler, e.ports[0]);
